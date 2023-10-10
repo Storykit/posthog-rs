@@ -4,7 +4,7 @@
 
 mod client;
 mod config;
-mod errors;
+pub mod errors;
 mod event;
 mod feature_flags;
 mod properties;
