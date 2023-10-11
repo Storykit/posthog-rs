@@ -1,36 +1,41 @@
 use crate::errors::Error;
 use crate::types::{FeatureKey, ProjectId};
 use crate::Client;
+use async_trait::async_trait;
 use serde::Deserialize;
 
 /// API for feature flags as described [here](https://posthog.com/docs/api/feature-flags)
+#[async_trait]
 pub trait FeatureFlagsAPI {
     /// Request to
     /// [/api/projects/{project_id}/feature_flags/](https://posthog.com/docs/api/feature-flags#get-api-projects-project_id-feature_flags)
-    fn list_feature_flags(&self, project_id: ProjectId) -> Result<Vec<FeatureFlag>, Error>;
+    async fn list_feature_flags(&self, project_id: ProjectId) -> Result<Vec<FeatureFlag>, Error>;
 
     /// Return a single feature flag based on the key
-    fn get_feature_flag(
+    async fn get_feature_flag(
         &self,
         project_id: ProjectId,
         feature_flag_key: FeatureKey,
     ) -> Result<FeatureFlag, Error>;
 }
 
+#[async_trait]
 impl FeatureFlagsAPI for Client {
-    fn list_feature_flags(&self, project_id: ProjectId) -> Result<Vec<FeatureFlag>, Error> {
+    async fn list_feature_flags(&self, project_id: ProjectId) -> Result<Vec<FeatureFlag>, Error> {
         let url = format!("/api/projects/{project_id}/feature_flags/");
 
-        let response = self.get_request(url)?;
+        let response = self.get_request(url).await?;
         let response: FeatureFlagResponse = response
             .json::<FeatureFlagResponse>()
+            .await
             .map_err(|e| Error::Serialization(e.to_string()))?;
         let mut result = response.results;
         while response.next.is_some() {
             if let Some(next_url) = response.next.clone() {
-                let response = self.get_request(next_url)?;
+                let response = self.get_request(next_url).await?;
                 let mut response: FeatureFlagResponse = response
                     .json::<FeatureFlagResponse>()
+                    .await
                     .map_err(|e| Error::Serialization(e.to_string()))?;
                 result.append(&mut response.results);
             } else {
@@ -40,12 +45,12 @@ impl FeatureFlagsAPI for Client {
         Ok(result)
     }
 
-    fn get_feature_flag(
+    async fn get_feature_flag(
         &self,
         project_id: ProjectId,
         feature_flag_key: FeatureKey,
     ) -> Result<FeatureFlag, Error> {
-        let feature_flags = self.list_feature_flags(project_id)?;
+        let feature_flags = self.list_feature_flags(project_id).await?;
         feature_flags
             .into_iter()
             .find(|feature_flag| feature_flag.key == feature_flag_key)
