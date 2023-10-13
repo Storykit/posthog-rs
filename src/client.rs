@@ -1,6 +1,6 @@
-use reqwest::blocking::Client as HttpClient;
-use reqwest::blocking::Response;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
+use reqwest::Client as HttpClient;
+use reqwest::Response;
 use std::time::Duration;
 
 use crate::config::{API_ENDPOINT, DEFAULT_TIMEOUT};
@@ -77,7 +77,7 @@ impl Client {
     /// Create new API Client
     pub fn new(options: ClientOptions) -> Self {
         let client = HttpClient::builder()
-            .timeout(Some(options.timeout))
+            .timeout(options.timeout)
             .build()
             .expect("Failed to create underlying HTTPClient"); // Unwrap here is as safe as `HttpClient::new`
 
@@ -90,17 +90,22 @@ impl Client {
     }
 
     /// Run get request towards API
-    pub(crate) fn get_request(&self, endpoint: String) -> APIResult<Response> {
+    pub(crate) async fn get_request(&self, endpoint: String) -> APIResult<Response> {
         self.client
             .get(self.full_url(endpoint))
             .header(CONTENT_TYPE, "application/json")
             .header(AUTHORIZATION, format!("Bearer {}", self.options.api_key))
             .send()
+            .await
             .map_err(|e| Error::Connection(e.to_string()))
     }
 
     /// Run post request towards API
-    pub(crate) fn post_request_with_body<B>(&self, endpoint: String, body: B) -> APIResult<Response>
+    pub(crate) async fn post_request_with_body<B>(
+        &self,
+        endpoint: String,
+        body: B,
+    ) -> APIResult<Response>
     where
         B: Sized + serde::Serialize,
     {
@@ -110,6 +115,7 @@ impl Client {
             .header(AUTHORIZATION, format!("Bearer {}", self.options.api_key))
             .body(serde_json::to_string(&body).expect("unwrap here is safe"))
             .send()
+            .await
             .map_err(|e| Error::Connection(e.to_string()))
     }
 }
