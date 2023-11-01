@@ -9,19 +9,19 @@ use serde::Deserialize;
 pub trait FeatureFlagsAPI {
     /// Request to
     /// [/api/projects/{project_id}/feature_flags/](https://posthog.com/docs/api/feature-flags#get-api-projects-project_id-feature_flags)
-    async fn list_feature_flags(&self, project_id: ProjectId) -> Result<Vec<FeatureFlag>, Error>;
+    async fn list_feature_flags(&self, project_id: &ProjectId) -> Result<Vec<FeatureFlag>, Error>;
 
     /// Return a single feature flag based on the key
     async fn get_feature_flag(
         &self,
-        project_id: ProjectId,
-        feature_flag_key: FeatureKey,
+        project_id: &ProjectId,
+        feature_flag_key: &FeatureKey,
     ) -> Result<FeatureFlag, Error>;
 }
 
 #[async_trait]
 impl FeatureFlagsAPI for Client {
-    async fn list_feature_flags(&self, project_id: ProjectId) -> Result<Vec<FeatureFlag>, Error> {
+    async fn list_feature_flags(&self, project_id: &ProjectId) -> Result<Vec<FeatureFlag>, Error> {
         let url = format!("/api/projects/{project_id}/feature_flags/");
 
         let response = self.get_request(url).await?;
@@ -47,8 +47,8 @@ impl FeatureFlagsAPI for Client {
 
     async fn get_feature_flag(
         &self,
-        project_id: ProjectId,
-        feature_flag_key: FeatureKey,
+        project_id: &ProjectId,
+        feature_flag_key: &FeatureKey,
     ) -> Result<FeatureFlag, Error> {
         let feature_flags = self.list_feature_flags(project_id).await?;
         feature_flags
