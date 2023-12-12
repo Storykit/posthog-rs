@@ -1,7 +1,8 @@
-use crate::errors::Error;
-use crate::properties::Properties;
 use chrono::NaiveDateTime;
 use serde::Serialize;
+
+use crate::errors::Error;
+use crate::properties::Properties;
 
 #[derive(Serialize, Debug, PartialEq, Eq)]
 pub struct Event {
@@ -29,5 +30,24 @@ impl Event {
             serde_json::to_value(prop).map_err(|e| Error::Serialization(e.to_string()))?;
         let _ = self.properties.props.insert(key.into(), as_json);
         Ok(())
+    }
+}
+
+#[derive(Serialize)]
+pub struct InnerEvent {
+    api_key: String,
+    event: String,
+    properties: Properties,
+    timestamp: Option<NaiveDateTime>,
+}
+
+impl InnerEvent {
+    pub fn new(event: Event, api_key: String) -> Self {
+        Self {
+            api_key,
+            event: event.event,
+            properties: event.properties,
+            timestamp: event.timestamp,
+        }
     }
 }
