@@ -1,10 +1,12 @@
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
-use reqwest::Client as HttpClient;
-use reqwest::Response;
 use std::time::Duration;
 
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
+use reqwest::{Client as HttpClient, Response};
+
 use crate::config::{API_ENDPOINT, DEFAULT_TIMEOUT};
+use crate::decide::{Decide, InnerDecide};
 use crate::errors::Error;
+use crate::event::{Event, InnerEvent};
 use crate::types::APIResult;
 
 /// Client option and configurations builder
@@ -101,7 +103,7 @@ impl Client {
     }
 
     /// Run post request towards API
-    pub(crate) async fn post_request_with_body<B>(
+    pub(crate) async fn post_request_with_body<B: Body>(
         &self,
         endpoint: String,
         body: B,
@@ -109,13 +111,31 @@ impl Client {
     where
         B: Sized + serde::Serialize,
     {
+        let inner_body = body.to_inner(self.options.api_key.clone());
         self.client
-            .get(self.full_url(endpoint))
+            .post(self.full_url(endpoint))
             .header(CONTENT_TYPE, "application/json")
-            .header(AUTHORIZATION, format!("Bearer {}", self.options.api_key))
-            .body(serde_json::to_string(&body).expect("unwrap here is safe"))
+            .body(inner_body.expect("unwrap here is safe"))
             .send()
             .await
             .map_err(|e| Error::Connection(e.to_string()))
+    }
+}
+
+pub(crate) trait Body {
+    fn to_inner(self, api_key: String) -> serde_json::Result<String>;
+}
+
+impl Body for Decide {
+    fn to_inner(self, api_key: String) -> serde_json::Result<String> {
+        let inner_decide = InnerDecide::new(self, api_key);
+        serde_json::to_string(&inner_decide)
+    }
+}
+
+impl Body for Event {
+    fn to_inner(self, api_key: String) -> serde_json::Result<String> {
+        let inner_event = InnerEvent::new(self, api_key);
+        serde_json::to_string(&inner_event)
     }
 }
