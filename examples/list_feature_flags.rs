@@ -7,7 +7,8 @@ async fn run() {
         .build()
         .unwrap();
 
-    let client = Client::new(client_options);
+    let client = Client::new(client_options).private();
+
     let feature_flags = client
         .list_feature_flags(&dotenv::var("POSTHOG_PROJECT_ID").unwrap())
         .await

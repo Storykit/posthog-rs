@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 
+use crate::client::PublicClient;
 use crate::decide::{Decide, DecideResponse};
 use crate::errors::Error;
 use crate::event::Event;
@@ -18,11 +19,11 @@ pub trait PublicAPI {
         Ok(())
     }
 
-    async fn decide(&self, user_id: String) -> Result<HashMap<String, bool>, Error>;
+    async fn decide(&self, user_id: &str) -> APIResult<HashMap<String, bool>>;
 }
 
 #[async_trait]
-impl PublicAPI for Client {
+impl PublicAPI for Client<PublicClient> {
     async fn capture(&self, event: Event) -> APIResult<()> {
         let _res = self
             .post_request_with_body("/capture/".into(), event)
@@ -30,7 +31,7 @@ impl PublicAPI for Client {
         Ok(())
     }
 
-    async fn decide(&self, user_id: String) -> Result<HashMap<String, bool>, Error> {
+    async fn decide(&self, user_id: &str) -> APIResult<HashMap<String, bool>> {
         let body = Decide::new(user_id);
         let url = format!("/decide?v=3");
         let res = self.post_request_with_body(url, body).await?;

@@ -2,11 +2,10 @@ use std::time::Duration;
 
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use reqwest::{Client as HttpClient, Response};
+use serde::{Deserialize, Serialize};
 
 use crate::config::{API_ENDPOINT, DEFAULT_TIMEOUT};
-use crate::decide::{Decide, InnerDecide};
 use crate::errors::Error;
-use crate::event::{Event, InnerEvent};
 use crate::types::APIResult;
 
 /// Client option and configurations builder
@@ -63,34 +62,24 @@ impl Default for ClientOptionsBuilder {
     }
 }
 
+#[derive(Clone)]
 pub struct ClientOptions {
     pub api_endpoint: String,
     api_key: String,
     pub timeout: Duration,
 }
 
+pub struct PrivateClient {}
+pub struct PublicClient {}
+
 /// Default client towards API
-pub struct Client {
+pub struct Client<State = PublicClient> {
     options: ClientOptions,
     client: HttpClient,
+    state: std::marker::PhantomData<State>,
 }
 
-impl Client {
-    /// Create new API Client
-    pub fn new(options: ClientOptions) -> Self {
-        let client = HttpClient::builder()
-            .timeout(options.timeout)
-            .build()
-            .expect("Failed to create underlying HTTPClient"); // Unwrap here is as safe as `HttpClient::new`
-
-        Self { options, client }
-    }
-
-    /// Combine url endpoint with API base url
-    fn full_url(&self, endpoint: String) -> String {
-        format!("{}{endpoint}", self.options.api_endpoint.clone())
-    }
-
+impl Client<PrivateClient> {
     /// Run get request towards API
     pub(crate) async fn get_request(&self, endpoint: String) -> APIResult<Response> {
         self.client
@@ -102,8 +91,18 @@ impl Client {
             .map_err(|e| Error::Connection(e.to_string()))
     }
 
+    pub fn public(&self) -> Client<PublicClient> {
+        Client {
+            options: self.options.clone(),
+            client: self.client.clone(),
+            state: std::marker::PhantomData,
+        }
+    }
+}
+
+impl Client<PublicClient> {
     /// Run post request towards API
-    pub(crate) async fn post_request_with_body<B: Body>(
+    pub(crate) async fn post_request_with_body<B>(
         &self,
         endpoint: String,
         body: B,
@@ -111,31 +110,53 @@ impl Client {
     where
         B: Sized + serde::Serialize,
     {
-        let inner_body = body.to_inner(self.options.api_key.clone());
+        let body = Body {
+            inner: body,
+            api_key: self.options.api_key.clone(),
+        };
         self.client
             .post(self.full_url(endpoint))
             .header(CONTENT_TYPE, "application/json")
-            .body(inner_body.expect("unwrap here is safe"))
+            .body(serde_json::to_string(&body).map_err(|e| Error::Serialization(e.to_string()))?)
             .send()
             .await
             .map_err(|e| Error::Connection(e.to_string()))
     }
-}
 
-pub(crate) trait Body {
-    fn to_inner(self, api_key: String) -> serde_json::Result<String>;
-}
-
-impl Body for Decide {
-    fn to_inner(self, api_key: String) -> serde_json::Result<String> {
-        let inner_decide = InnerDecide::new(self, api_key);
-        serde_json::to_string(&inner_decide)
+    pub fn private(&self) -> Client<PrivateClient> {
+        Client {
+            options: self.options.clone(),
+            client: self.client.clone(),
+            state: std::marker::PhantomData,
+        }
     }
 }
 
-impl Body for Event {
-    fn to_inner(self, api_key: String) -> serde_json::Result<String> {
-        let inner_event = InnerEvent::new(self, api_key);
-        serde_json::to_string(&inner_event)
+impl<State> Client<State> {
+    /// Combine url endpoint with API base url
+    fn full_url(&self, endpoint: String) -> String {
+        format!("{}{endpoint}", self.options.api_endpoint.clone())
     }
+}
+
+impl Client {
+    /// Create new API Client
+    pub fn new(options: ClientOptions) -> Self {
+        let client = HttpClient::builder()
+            .timeout(options.timeout)
+            .build()
+            .expect("Failed to create underlying HTTPClient"); // Unwrap here is as safe as `HttpClient::new`
+        Self {
+            options,
+            client,
+            state: std::marker::PhantomData,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct Body<T: Serialize> {
+    api_key: String,
+    #[serde(flatten)]
+    inner: T,
 }
