@@ -32,22 +32,3 @@ impl Event {
         Ok(())
     }
 }
-
-#[derive(Serialize)]
-pub struct InnerEvent {
-    api_key: String,
-    event: String,
-    properties: Properties,
-    timestamp: Option<NaiveDateTime>,
-}
-
-impl InnerEvent {
-    pub fn new(event: Event, api_key: String) -> Self {
-        Self {
-            api_key,
-            event: event.event,
-            properties: event.properties,
-            timestamp: event.timestamp,
-        }
-    }
-}

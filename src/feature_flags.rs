@@ -1,8 +1,10 @@
+use async_trait::async_trait;
+use serde::Deserialize;
+
+use crate::client::PrivateClient;
 use crate::errors::Error;
 use crate::types::{FeatureKey, ProjectId};
 use crate::Client;
-use async_trait::async_trait;
-use serde::Deserialize;
 
 /// API for feature flags as described [here](https://posthog.com/docs/api/feature-flags)
 #[async_trait]
@@ -20,7 +22,7 @@ pub trait FeatureFlagsAPI {
 }
 
 #[async_trait]
-impl FeatureFlagsAPI for Client {
+impl FeatureFlagsAPI for Client<PrivateClient> {
     async fn list_feature_flags(&self, project_id: &ProjectId) -> Result<Vec<FeatureFlag>, Error> {
         let url = format!("/api/projects/{project_id}/feature_flags/");
 

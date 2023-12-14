@@ -8,24 +8,9 @@ pub struct Decide {
 }
 
 impl Decide {
-    pub fn new<S: Into<String>>(distinct_id: S) -> Self {
+    pub fn new(distinct_id: &str) -> Self {
         Self {
             distinct_id: distinct_id.into(),
-        }
-    }
-}
-
-#[derive(serde::Serialize)]
-pub(crate) struct InnerDecide {
-    api_key: String,
-    distinct_id: String,
-}
-
-impl InnerDecide {
-    pub(crate) fn new(decide: Decide, api_key: String) -> Self {
-        Self {
-            api_key,
-            distinct_id: decide.distinct_id,
         }
     }
 }
