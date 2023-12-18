@@ -1,13 +1,11 @@
-use posthog_rs::{Client, ClientOptionsBuilder, FeatureFlagsAPI};
+use posthog_rs::{ClientBuilder, FeatureFlagsAPI};
 
 async fn run() {
-    let client_options = ClientOptionsBuilder::new()
+    let client = ClientBuilder::new()
+        .set_private_api_key(dotenv::var("POSTHOG_API_KEY").unwrap())
         .set_endpoint(dotenv::var("POSTHOG_URL").unwrap())
-        .set_api_key(dotenv::var("POSTHOG_API_KEY").unwrap())
         .build()
         .unwrap();
-
-    let client = Client::new(client_options).private();
 
     let feature_flags = client
         .list_feature_flags(&dotenv::var("POSTHOG_PROJECT_ID").unwrap())

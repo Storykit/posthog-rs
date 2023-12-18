@@ -1,10 +1,9 @@
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::client::PrivateClient;
+use crate::client::{Client, PrivateClient};
 use crate::errors::Error;
 use crate::types::{FeatureKey, ProjectId};
-use crate::Client;
 
 /// API for feature flags as described [here](https://posthog.com/docs/api/feature-flags)
 #[async_trait]
