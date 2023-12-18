@@ -8,28 +8,29 @@ use crate::config::{API_ENDPOINT, DEFAULT_TIMEOUT};
 use crate::errors::Error;
 use crate::types::APIResult;
 
+pub struct PublicBuilder;
+pub struct PrivateBuilder;
+pub struct NoKey;
+
 /// Client option and configurations builder
-pub struct ClientOptionsBuilder {
+pub struct ClientBuilder<State = NoKey> {
     api_endpoint: String,
-    api_key: Option<String>,
+    private_api_key: Option<String>,
+    public_api_key: Option<String>,
     timeout: Duration,
+    state: std::marker::PhantomData<State>,
 }
 
-impl ClientOptionsBuilder {
+impl ClientBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+}
 
+impl<State> ClientBuilder<State> {
     /// API endpoint
     pub fn set_endpoint(mut self, api_endpoint: String) -> Self {
         self.api_endpoint = api_endpoint;
-        self
-    }
-
-    /// API key - Note that this does not differentiate between public and private API and requests
-    /// with a public API key towards the Private API will fail
-    pub fn set_api_key(mut self, api_key: String) -> Self {
-        self.api_key = Some(api_key);
         self
     }
 
@@ -38,26 +39,70 @@ impl ClientOptionsBuilder {
         self.timeout = timeout;
         self
     }
+}
 
-    pub fn build(self) -> Result<ClientOptions, Error> {
-        if let Some(api_key) = self.api_key {
-            Ok(ClientOptions {
-                api_endpoint: self.api_endpoint,
-                api_key,
-                timeout: self.timeout,
-            })
-        } else {
-            Err(Error::ClientOptionConfigError("Missing API key!".into()))
+// As long as no key has been set, we can set either a public or private key, but once a key has
+// been set we can't put in another type of key
+impl ClientBuilder<NoKey> {
+    pub fn set_private_api_key(self, api_key: String) -> ClientBuilder<PrivateBuilder> {
+        ClientBuilder {
+            api_endpoint: self.api_endpoint,
+            private_api_key: Some(api_key),
+            public_api_key: self.public_api_key,
+            timeout: self.timeout,
+            state: std::marker::PhantomData,
+        }
+    }
+
+    pub fn set_public_api_key(self, api_key: String) -> ClientBuilder<PublicBuilder> {
+        ClientBuilder {
+            api_endpoint: self.api_endpoint,
+            private_api_key: self.private_api_key,
+            public_api_key: Some(api_key),
+            timeout: self.timeout,
+            state: std::marker::PhantomData,
         }
     }
 }
 
-impl Default for ClientOptionsBuilder {
+impl ClientBuilder<PublicBuilder> {
+    pub fn build(self) -> Result<Client<PublicClient>, Error> {
+        if let Some(public_api) = self.public_api_key {
+            let options = ClientOptions {
+                api_endpoint: self.api_endpoint,
+                api_key: public_api,
+                timeout: self.timeout,
+            };
+            return Ok(Client::<PublicClient>::new(options));
+        } else {
+            return Err(Error::ClientOptionConfigError("Missing API key!".into()));
+        };
+    }
+}
+
+impl ClientBuilder<PrivateBuilder> {
+    pub fn build(self) -> Result<Client<PrivateClient>, Error> {
+        if let Some(private_api) = self.private_api_key {
+            let options = ClientOptions {
+                api_endpoint: self.api_endpoint,
+                api_key: private_api,
+                timeout: self.timeout,
+            };
+            return Ok(Client::<PrivateClient>::new(options));
+        } else {
+            return Err(Error::ClientOptionConfigError("Missing API key!".into()));
+        };
+    }
+}
+
+impl Default for ClientBuilder {
     fn default() -> Self {
         Self {
             api_endpoint: API_ENDPOINT.to_string(),
-            api_key: None,
+            public_api_key: None,
+            private_api_key: None,
             timeout: DEFAULT_TIMEOUT,
+            state: std::marker::PhantomData,
         }
     }
 }
@@ -69,11 +114,11 @@ pub struct ClientOptions {
     pub timeout: Duration,
 }
 
-pub struct PrivateClient {}
-pub struct PublicClient {}
+pub struct PrivateClient;
+pub struct PublicClient;
 
 /// Default client towards API
-pub struct Client<State = PublicClient> {
+pub struct Client<State> {
     options: ClientOptions,
     client: HttpClient,
     state: std::marker::PhantomData<State>,
@@ -89,14 +134,6 @@ impl Client<PrivateClient> {
             .send()
             .await
             .map_err(|e| Error::Connection(e.to_string()))
-    }
-
-    pub fn public(&self) -> Client<PublicClient> {
-        Client {
-            options: self.options.clone(),
-            client: self.client.clone(),
-            state: std::marker::PhantomData,
-        }
     }
 }
 
@@ -122,14 +159,6 @@ impl Client<PublicClient> {
             .await
             .map_err(|e| Error::Connection(e.to_string()))
     }
-
-    pub fn private(&self) -> Client<PrivateClient> {
-        Client {
-            options: self.options.clone(),
-            client: self.client.clone(),
-            state: std::marker::PhantomData,
-        }
-    }
 }
 
 impl<State> Client<State> {
@@ -137,11 +166,8 @@ impl<State> Client<State> {
     fn full_url(&self, endpoint: String) -> String {
         format!("{}{endpoint}", self.options.api_endpoint.clone())
     }
-}
 
-impl Client {
-    /// Create new API Client
-    pub fn new(options: ClientOptions) -> Self {
+    fn new(options: ClientOptions) -> Self {
         let client = HttpClient::builder()
             .timeout(options.timeout)
             .build()

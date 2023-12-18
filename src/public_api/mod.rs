@@ -2,12 +2,11 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 
-use crate::client::PublicClient;
+use crate::client::{Client, PublicClient};
 use crate::decide::{Decide, DecideResponse};
 use crate::errors::Error;
 use crate::event::Event;
 use crate::types::APIResult;
-use crate::Client;
 
 #[async_trait]
 pub trait PublicAPI {

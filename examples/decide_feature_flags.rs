@@ -1,17 +1,21 @@
-use posthog_rs::{Client, ClientOptionsBuilder, PublicAPI};
+use posthog_rs::{ClientBuilder, PublicAPI};
 
 async fn run() {
-    let client_options = ClientOptionsBuilder::new()
+    let client = ClientBuilder::new()
         .set_endpoint(dotenv::var("POSTHOG_URL").unwrap())
-        .set_api_key(dotenv::var("POSTHOG_PROJECT_API_KEY").unwrap())
+        .set_public_api_key(dotenv::var("POSTHOG_PROJECT_API_KEY").unwrap())
         .build()
         .unwrap();
 
-    let client = Client::new(client_options);
-    let feature_flags = client.decide("1234".to_owned()).await.unwrap();
+    let feature_flags = client.decide("1234").await;
 
-    for flag in &feature_flags {
-        println!("name: {}, value: {}", flag.0, flag.1);
+    match feature_flags {
+        Ok(flags) => {
+            for flag in &flags {
+                println!("name: {}, value: {}", flag.0, flag.1);
+            }
+        }
+        Err(e) => println!("error: {:?}", e),
     }
 }
 

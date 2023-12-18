@@ -1,13 +1,11 @@
-use posthog_rs::{Client, ClientOptionsBuilder, Event, PublicAPI};
+use posthog_rs::{ClientBuilder, Event, PublicAPI};
 
 async fn run() {
-    let client_options = ClientOptionsBuilder::new()
+    let client = ClientBuilder::new()
+        .set_public_api_key(dotenv::var("POSTHOG_API_KEY").unwrap())
         .set_endpoint(dotenv::var("POSTHOG_URL").unwrap())
-        .set_api_key(dotenv::var("POSTHOG_API_KEY").unwrap())
         .build()
         .unwrap();
-
-    let client = Client::new(client_options);
 
     let mut event = Event::new("test", "1234");
     event.insert_prop("key1", "value1").unwrap();
