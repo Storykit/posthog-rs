@@ -13,7 +13,7 @@ mod public_api;
 /// Data types related to the API
 pub mod types;
 
-pub use client::ClientBuilder;
+pub use client::{Client, ClientBuilder, PrivateClient, PublicClient};
 pub use event::Event;
 pub use feature_flags::FeatureFlagsAPI;
 pub use public_api::PublicAPI;
